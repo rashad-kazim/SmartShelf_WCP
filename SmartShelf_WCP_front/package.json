@@ -1,0 +1,37 @@
+{
+  "name": "react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "preview": "next start -p 3000",
+    "clean": "node -e \"const fs=require('fs'); fs.rmSync('.next', { recursive: true, force: true }); fs.rmSync('dist', { recursive: true, force: true })\"",
+    "lint": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.11.2",
+    "clsx": "^2.1.1",
+    "i18next": "^25.8.20",
+    "lucide-react": "^0.546.0",
+    "next": "^16.2.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-i18next": "^16.5.8",
+    "react-redux": "^9.2.0",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^22.14.0",
+    "@types/react": "19.2.14",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}

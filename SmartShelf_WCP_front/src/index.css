@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-header-bg: var(--header-bg);
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-background: var(--background);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+}
+
+:root {
+  --header-bg: rgba(33, 43, 54, 1);
+  --brand-primary: rgba(0, 207, 255, 1);
+  --brand-secondary: rgba(0, 123, 255, 1);
+  --surface: rgba(255, 255, 255, 1);
+  --surface-muted: rgba(246, 248, 251, 1);
+  --background: rgba(240, 242, 245, 1);
+  --text-primary: rgba(31, 41, 55, 1);
+  --text-muted: rgba(107, 114, 128, 1);
+  --border: rgba(148, 163, 184, 0.35);
+  --success: rgba(40, 167, 69, 1);
+  --warning: rgba(255, 193, 7, 1);
+  --danger: rgba(220, 53, 69, 1);
+}
+
+.dark {
+  --header-bg: rgba(26, 32, 44, 1);
+  --brand-primary: rgba(0, 207, 255, 1);
+  --brand-secondary: rgba(0, 123, 255, 1);
+  --surface: rgba(45, 55, 72, 1);
+  --surface-muted: rgba(31, 41, 55, 1);
+  --background: rgba(17, 24, 39, 1);
+  --text-primary: rgba(226, 232, 240, 1);
+  --text-muted: rgba(160, 174, 192, 1);
+  --border: rgba(148, 163, 184, 0.25);
+  --success: rgba(72, 187, 120, 1);
+  --warning: rgba(236, 201, 75, 1);
+  --danger: rgba(252, 129, 129, 1);
+}
+
+body {
+  @apply bg-background text-text-primary font-sans;
+}
+
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  cursor: pointer;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite;
+}
+
+@keyframes loader-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loader-spin-reverse {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-loader-spin {
+  animation: loader-spin 1.15s linear infinite;
+}
+
+.animate-loader-spin-reverse {
+  animation: loader-spin-reverse 1.4s linear infinite;
+}
