@@ -246,7 +246,7 @@ export default function InstallationWizard() {
       {/* Header */}
       <div className="text-center space-y-2">
         
-        <h1 className="text-3xl font-bold text-text-primary">{t('newinstallation')}</h1>
+        <h1 className="text-3xl font-bold text-text-primary">{t('new_installation')}</h1>
       </div>
 
       {/* Progress Bar */}
