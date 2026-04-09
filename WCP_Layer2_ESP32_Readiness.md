@@ -3,60 +3,97 @@
 ## Amaç
 
 WCP tarafını şimdi tamamla.
-Layer2, Layer1 ve gerçek ESP32 geldiğinde sadece entegrasyon ve küçük iyileştirme kalsın.
+Layer2, Layer1 ve gerçek ESP32 geldiğinde sadece entegrasyon ve küçük düzeltme kalsın.
 
 ## Şu Anda Hazır Olanlar
 
 - Next.js tabanlı admin panel hazır.
-- Gerçek backend API katmanı hazır.
-- PostgreSQL, Redis, MinIO bağlantıları var.
-- Installation draft akışı var.
-- Master token ve ortak ESP token akışı var.
-- Store, user, notification, preferences, device logs akışları var.
-- SSE tabanlı bildirim altyapısı var.
+- Go backend API katmanı hazır.
+- PostgreSQL, Redis ve MinIO bağlantıları hazır.
+- Installation draft akışı hazır.
+- Master token ve ortak ESP token akışı hazır.
+- Store, user, notification, preferences ve device logs akışları hazır.
+- SSE tabanlı bildirim altyapısı hazır.
 - Kullanıcı tercihleri backend tarafında saklanıyor.
+- Device log retention kuralı aktif. Son 30 günden eski loglar siliniyor.
 
-## WCP Tarafında Layer2 Geldiğinde Yapılacaklar
+## Kesinleşen Veri ve Akış Kararları
 
-### 1. Authentication ve Güven
+### 1. Layer1
 
-- Layer2 ile WCP arasında `master_token` doğrulaması gerçek hale gelecek.
-- Layer2 heartbeat ve sync endpointleri imzalı istek kabul edecek.
-- `timestamp + signature + batch_id` doğrulaması aktif olacak.
-- Replay attack engeli production modda zorunlu hale gelecek.
+- Layer1 WCP içinde bağımsız entity olmayacak.
+- Sadece Layer 2 details alanında `layer1_version` gösterilecek.
+- Layer2 heartbeat veya sync payload içinde `layer1_version` taşınacak.
 
-### 2. Heartbeat Gerçekleştirmesi
+### 2. Token Yapısı
+
+- `master_token` store veya gateway seviyesinde doğrulama için kullanılacak.
+- `esp_token` aynı mağaza içindeki tüm ESP32 cihazları için ortak kalacak.
+- Layer2 henüz yokken gerçek token doğrulaması bypass kalacak.
+
+### 3. Device Log Canonical Modeli
+
+- `report_index` artık canonical değer taşır:
+  - `opening`
+  - `middle`
+  - `closing`
+- Frontend bu değerleri çeviri anahtarları ile gösterir.
+- Eski veritabanı kayıtlarındaki `Opening Logs`, `Middle Logs`, `Closing Logs` değerleri geçici uyumlulukla okunur.
+
+### 4. Ülke ve Şehir Kaynağı
+
+- Ülke kaynağı `REST Countries API`.
+- Şehir kaynağı `CountriesNow API`.
+- Backend canonical ülke ve şehir listesini getirir.
+- Frontend ülke listesini cache içinde tutar.
+- Dil değişince ülke listesi tekrar istenmez.
+- Ülke adları frontend içinde locale duyarlı gösterilir.
+- Şehir listesi seçilen ülkeye göre yeniden istenir.
+- Şehir listesi seçilen dile göre yeniden sıralanır.
+- CountriesNow şehir çevirisi sağlamadığı için şehir adı canonical kalır.
+- Yani şehirlerde sahte sabit çeviri kullanılmaz.
+
+## Layer2 Geldiğinde WCP’de Yapılacaklar
+
+### Authentication ve Güven
+
+- `master_token` doğrulamasını gerçek hale getir.
+- Heartbeat ve sync isteklerini imzalı hale getir.
+- `timestamp + signature + batch_id` doğrulaması aç.
+- Replay attack engelini production zorunluluğu yap.
+
+### Heartbeat
 
 - `POST /api/v1/layer2/heartbeat` gerçek Layer2 tarafından beslenecek.
 - `last_heartbeat_at`, `sync_status`, `pending_sync_data` canlı hesaplanacak.
-- Store summary ve Layer 2 details ekranları canlı veriye dönecek.
+- Store summary ve Layer 2 details ekranları canlı veriye bağlanacak.
 
-### 3. Sync ve Telemetry
+### Sync ve Telemetry
 
 - `POST /api/v1/layer2/sync` gerçek log paketlerini kabul edecek.
-- `report_type`, `status_code`, `soc_temp` alanları Layer2 üzerinden dolacak.
-- `report_index` belirleme kuralı gerçek saatlere göre Layer2 veya backend tarafında netleşecek.
-- Duplicate paket engeli `packet_id` veya `batch_id + device_id` ile production düzeyine çıkarılacak.
+- `report_type`, `status_code`, `soc_temp` canlı akıştan dolacak.
+- Duplicate paket engeli production seviyesinde sıkılaştırılacak.
+- `packet_id` veya kesin batch kuralı freeze edilip zorunlu yapılacak.
 
-### 4. Notification Üretimi
+### Bildirimler
 
-- Store offline, unauthorized access, low battery olayları Layer2 verisine göre üretilecek.
-- Critical ve error olayları `pending_ack` mantığıyla çalışacak.
+- Store offline, unauthorized access ve low battery olayları gerçek telemetry ile üretilecek.
+- Critical ve error olayları `pending_ack` mantığı ile çalışacak.
 - Warning olayları otomatik silence kuralına bağlanacak.
-- SSE artık gerçek olay akışı ile beslenecek.
+- SSE gerçek olay akışı ile beslenecek.
 
-### 5. Store Health
+### Dashboard ve Health
 
-- Dashboard kartları gerçek canlı store health verisiyle beslenecek.
-- Critical error grafiği gerçek telemetry verisinden çıkacak.
-- Pending sync ve unhealthy device sinyalleri gerçek olaylardan türetilecek.
+- Dashboard kartları canlı store health verisine bağlanacak.
+- Critical error grafiği gerçek telemetry üstünden üretilecek.
+- Pending sync ve unhealthy device sinyalleri canlı olaylardan türetilecek.
 
-## WCP Tarafında ESP32 Geldiğinde Yapılacaklar
+## ESP32 Geldiğinde WCP’de Yapılacaklar
 
-### 1. Bluetooth Kurulum Testi
+### BLE Kurulum Testi
 
-- Step 4 cihaz formundaki alanlar gerçek BLE payload ile eşlenecek.
-- Kurulum paketi şu alanlarla doğrulanacak:
+- Step 4 formundaki alanları gerçek BLE payload ile doğrula.
+- Şu alanlar gerçek cihaz üstünde test edilecek:
   - `country`
   - `city`
   - `storeName`
@@ -73,71 +110,52 @@ Layer2, Layer1 ve gerçek ESP32 geldiğinde sadece entegrasyon ve küçük iyile
   - `wifiPassword`
   - `fontSettings`
 
-### 2. İlk Handshake
+### İlk Handshake
 
-- Installation tamamlandıktan sonra cihazlar ilk `handshake` paketini atacak.
-- `pending -> paired -> active` geçişi gerçek cihaz sinyaline göre işleyecek.
-- İlk handshake gecikmesi için timeout kuralı netleştirilecek.
+- Installation tamamlandıktan sonra cihaz ilk `handshake` paketini gönderecek.
+- `pending -> paired -> active` geçişi gerçek cihaz sinyali ile işleyecek.
+- İlk handshake timeout kuralı saha verisiyle netleşecek.
 
-### 3. Device Lifecycle Kuralları
+### Device Lifecycle
 
 - `pending`: Step 4 eklendi ama BLE kurulmadı.
 - `paired`: BLE kuruldu ama ilk handshake gelmedi.
 - `active`: son 24 saatte geçerli paket geldi.
-- `offline`: beklenen pencere geçti, ek tolerans da aşıldı.
+- `offline`: beklenen pencere ve tolerans aşıldı.
 - `unhealthy`: `status_code > 0` veya kritik batarya.
 - `revoked`: güvenlik nedeniyle erişimi kesildi.
 - `decommissioned`: cihaz emekli edildi.
 
-### 4. Device Logs Doğrulaması
+### Device Logs Doğrulaması
 
-- Günlük 3 paket akışı gerçek cihazlarla doğrulanacak.
-- Default filtre davranışı şu sıraya göre test edilecek:
+- Günde 3 paket akışı gerçek cihazlarla doğrulanacak.
+- Default filtre akışı doğrulanacak:
   - gün seçimi
   - report index
   - report type
   - status code
   - critical only
 
-### 5. Font ve Screen Size
+### Font ve Ekran Boyutu
 
-- BLE ile gönderilen font ayarları gerçek ekranda doğrulanacak.
-- Screen size eşleşmesi gerçek ESP32 + ekran kombinasyonlarında teyit edilecek.
+- BLE ile giden font ayarları gerçek ekranda doğrulanacak.
+- Screen size eşleşmesi gerçek cihaz kombinasyonlarında teyit edilecek.
 
-## Layer1 Geldiğinde Yapılacaklar
+## Geçici Bypass Kararları
 
-- Layer1 WCP’de bağımsız entity olmayacak.
-- Sadece Layer 2 details kartında `layer1_version` gösterilecek.
-- Layer2 sync veya heartbeat payload içinde `layer1_version` zorunlu olacak.
+- Layer2 henüz yok. `master_token` doğrulaması geçici bypass kalır.
+- ESP32 henüz yok. BLE payload doğrulaması geçici bypass kalır.
+- Gerçek handshake kontrolü entegrasyon gününde açılır.
+- Gerçek device auth kontrolü entegrasyon gününde açılır.
+- Bu bypasslar manuel WCP testini bloklamamak için tutulur.
 
-## Tam Çalışır Hale Gelmek İçin Son Kontrol Listesi
-
-### Backend
-
-- Layer2 request signing aktif et.
-- Sync idempotency production kuralını kesinleştir.
-- Notification event üretimini gerçek telemetry kurallarına bağla.
-- Archived logs worker planını aç.
-
-### Frontend
-
-- BLE kurulum testinde saha geri bildirimine göre küçük form düzeltmeleri yap.
-- Device status rozetlerini gerçek cihaz davranışına göre ince ayarla.
-- Dashboard sayılarını gerçek veriye göre son kez kalibre et.
-
-### Ortak
-
-- ESP32 firmware payload alanlarını freeze et.
-- Layer2 sync payload alanlarını freeze et.
-- Store offline ve unauthorized access alarm eşiklerini freeze et.
-
-## Şu Anda Geri Dönülmeden Kapatılmış Konular
+## Kapanmış Konular
 
 - Layer1 ayrı modül olmayacak.
-- Export ilk fazda yok.
-- ClickHouse ilk fazda yok.
-- Kafka, RabbitMQ, gateway katmanı ilk fazda yok.
-- WCP tarafı önce transactional backend olarak bitecek.
+- Export ilk fazda olmayacak.
+- ClickHouse ilk fazda olmayacak.
+- Kafka, RabbitMQ ve gateway katmanı ilk fazda olmayacak.
+- WCP önce transactional backend olarak bitecek.
 
 ## Sonuç
 

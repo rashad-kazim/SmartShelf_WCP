@@ -5,9 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { Activity, AlertTriangle, Building2, Cpu, Globe2, MapPinned } from 'lucide-react';
 import DashboardLoading from '@/components/loading/DashboardLoading';
 import QueryErrorState from '@/components/feedback/QueryErrorState';
-import { useGetActivityFeedQuery, useGetDashboardSummaryQuery } from '@/api/api';
+import { useGetActivityFeedQuery, useGetCitiesQuery, useGetCountriesQuery, useGetDashboardSummaryQuery } from '@/api/api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { translateCity, translateCountry } from '@/i18n/ui';
 import { cn } from '@/utils/cn';
 import type { DashboardQueryArgs, DashboardTrendPoint } from '@/features/dashboard/types';
 
@@ -108,12 +109,13 @@ function LineChart({ points }: { points: DashboardTrendPoint[] }) {
 }
 
 export default function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [filters, setFilters] = useState<DashboardQueryArgs>({
     range: '7d',
     country: 'all',
     city: 'all',
   });
+  const currentLanguage = (i18n.resolvedLanguage ?? 'en').toLowerCase();
   const {
     data: summary,
     isLoading: isSummaryLoading,
@@ -128,9 +130,16 @@ export default function Dashboard() {
     error: activityError,
     refetch: refetchActivity,
   } = useGetActivityFeedQuery(filters);
-
-  const availableCountries = summary?.availableCountries ?? [];
-  const availableCities = summary?.availableCities ?? [];
+  const { data: availableCountryOptions = [] } = useGetCountriesQuery({ source: 'stores' });
+  const { data: availableCities = [] } = useGetCitiesQuery({ country: filters.country, source: 'stores' }, {
+    skip: filters.country === 'all',
+  });
+  const availableCountries = [...availableCountryOptions].sort((left, right) =>
+    translateCountry(t, left.name, currentLanguage).localeCompare(translateCountry(t, right.name, currentLanguage), currentLanguage),
+  );
+  const sortedCities = [...availableCities].sort((left, right) =>
+    translateCity(t, left).localeCompare(translateCity(t, right), currentLanguage),
+  );
 
   useEffect(() => {
     if (filters.country === 'all' && filters.city !== 'all') {
@@ -209,8 +218,8 @@ export default function Dashboard() {
             >
               <option value="all">{t('all_countries')}</option>
               {availableCountries.map((country) => (
-                <option key={country} value={country}>
-                  {t(country === 'UK' ? 'united_kingdom' : country.toLowerCase())}
+                <option key={country.code || country.name} value={country.name}>
+                  {translateCountry(t, country.name, currentLanguage)}
                 </option>
               ))}
             </select>
@@ -223,9 +232,9 @@ export default function Dashboard() {
               className="bg-transparent text-sm font-semibold text-text-primary outline-none"
             >
               <option value="all">{t('all_cities')}</option>
-              {availableCities.map((city) => (
+              {sortedCities.map((city) => (
                 <option key={city} value={city}>
-                  {t(city.toLowerCase())}
+                  {translateCity(t, city)}
                 </option>
               ))}
             </select>
@@ -327,18 +336,25 @@ export default function Dashboard() {
           <span className="text-xs font-mono text-text-muted">{t('last_60_mins')}</span>
         </CardHeader>
         <CardContent className="space-y-4 pt-6">
-          {activityFeed.map((item) => (
-            <div key={item.id} className="flex items-start gap-4 border-b border-border pb-4 last:border-0 last:pb-0">
-              <div className="mt-1 h-2 w-2 rounded-full bg-brand-primary" />
-              <div className="flex-1">
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-sm font-medium">{t(item.messageKey)}</p>
-                  <span className="text-xs text-text-muted">{t(item.timeKey)}</span>
-                </div>
-                <p className="font-mono text-xs text-text-muted">{t(item.detailsKey)}</p>
-              </div>
+          {activityFeed.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-background/60 px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-text-primary">{t('no_activity_feed')}</p>
+              <p className="mt-2 text-xs text-text-muted">{t('no_activity_feed_desc')}</p>
             </div>
-          ))}
+          ) : (
+            activityFeed.map((item) => (
+              <div key={item.id} className="flex items-start gap-4 border-b border-border pb-4 last:border-0 last:pb-0">
+                <div className="mt-1 h-2 w-2 rounded-full bg-brand-primary" />
+                <div className="flex-1">
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-sm font-medium">{t(item.messageKey)}</p>
+                    <span className="text-xs text-text-muted">{t(item.timeKey)}</span>
+                  </div>
+                  <p className="font-mono text-xs text-text-muted">{t(item.detailsKey)}</p>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

@@ -59,7 +59,7 @@ func (s *State) IngestSync(ctx context.Context, payload SyncPayload) (string, er
 		if loggedAt.IsZero() {
 			loggedAt = time.Now().UTC()
 		}
-		reportIndex := log.ReportIndex
+		reportIndex := normalizeReportIndex(log.ReportIndex)
 		if reportIndex == "" {
 			reportIndex = deriveReportIndex(loggedAt)
 		}
@@ -83,6 +83,9 @@ func (s *State) IngestSync(ctx context.Context, payload SyncPayload) (string, er
 
 	if err = tx.Commit(queryCtx); err != nil {
 		return "", fmt.Errorf("sync commit: %w", err)
+	}
+	if err = s.purgeExpiredDeviceLogs(ctx); err != nil {
+		return "", err
 	}
 
 	return "accepted", nil

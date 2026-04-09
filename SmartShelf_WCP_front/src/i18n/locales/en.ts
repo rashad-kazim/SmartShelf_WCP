@@ -228,6 +228,8 @@ const en = {
   all_notifications: 'All Notifications',
   view_all: 'View All',
   unread: 'Unread',
+  no_activity_feed: 'No recent activity yet',
+  no_activity_feed_desc: 'New operational events will appear here.',
   no_notifications: 'No Notifications Yet',
   no_notifications_desc: 'New operational updates and alerts will appear here.',
   notification_store_sync_title: 'Store sync completed',
@@ -317,6 +319,16 @@ const en = {
   dashboard_highlight_coverage: 'Operational Coverage',
   dashboard_highlight_pending_ack: 'Pending Acknowledgements',
   dashboard_highlight_store_growth: 'Store Growth',
+  email_not_registered: 'Email address is not registered.',
+  password_incorrect: 'Password is incorrect.',
+  wcp_access_denied: 'This account does not have permission to access WCP.',
+  invalid_credentials: 'Email or password is invalid.',
+  too_many_login_attempts: 'Too many failed login attempts. Try again later.',
+  invalid_session: 'Session is invalid.',
+  store_not_found: 'Store was not found.',
+  user_not_found: 'User was not found.',
+  at_least_one_device_required: 'At least one device is required.',
+  device_location_required: 'Device location is required.',
 };
 
 export default en;

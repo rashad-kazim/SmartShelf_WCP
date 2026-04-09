@@ -66,13 +66,14 @@ func (s *State) runMigrations(ctx context.Context) error {
 			battery INTEGER NOT NULL,
 			voltage DOUBLE PRECISION NOT NULL,
 			rssi INTEGER NOT NULL,
-			report_index TEXT NOT NULL DEFAULT 'Closing Logs',
+			report_index TEXT NOT NULL DEFAULT 'closing',
 			report_type TEXT NOT NULL,
 			status_code INTEGER NOT NULL DEFAULT 0,
 			soc_temp DOUBLE PRECISION NOT NULL DEFAULT 0,
 			logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
-		`ALTER TABLE device_logs ADD COLUMN IF NOT EXISTS report_index TEXT NOT NULL DEFAULT 'Closing Logs'`,
+		`ALTER TABLE device_logs ADD COLUMN IF NOT EXISTS report_index TEXT NOT NULL DEFAULT 'closing'`,
+		`ALTER TABLE device_logs ALTER COLUMN report_index SET DEFAULT 'closing'`,
 		`CREATE INDEX IF NOT EXISTS idx_device_logs_store_date ON device_logs (store_id, logged_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS activities (
 			id TEXT PRIMARY KEY,

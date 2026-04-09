@@ -17,22 +17,25 @@ interface DeviceLogsProps {
 
 const today = new Date();
 const todayIso = today.toISOString().slice(0, 10);
+const REPORT_INDEX_OPENING = 'opening' as const;
+const REPORT_INDEX_MIDDLE = 'middle' as const;
+const REPORT_INDEX_CLOSING = 'closing' as const;
 
 const getLatestPacketIndex = (date: string) => {
   if (date !== todayIso) {
-    return 'Closing Logs';
+    return REPORT_INDEX_CLOSING;
   }
 
   const currentHour = new Date().getHours();
   if (currentHour >= 16) {
-    return 'Closing Logs';
+    return REPORT_INDEX_CLOSING;
   }
 
   if (currentHour >= 12) {
-    return 'Middle Logs';
+    return REPORT_INDEX_MIDDLE;
   }
 
-  return 'Opening Logs';
+  return REPORT_INDEX_OPENING;
 };
 
 const statusCodeMeta = {
@@ -281,9 +284,9 @@ const DeviceLogs = ({ embedded = false, storeId: storeIdProp }: DeviceLogsProps)
             onChange={(event) => handleFilterChange('packetIndex', event.target.value)}
             className="input w-full cursor-pointer rounded-lg border-border bg-background p-2"
           >
-            <option value="Opening Logs">{t('opening_logs')}</option>
-            <option value="Middle Logs">{t('middle_logs')}</option>
-            <option value="Closing Logs">{t('closing_logs_latest')}</option>
+            <option value={REPORT_INDEX_OPENING}>{t('opening_logs')}</option>
+            <option value={REPORT_INDEX_MIDDLE}>{t('middle_logs')}</option>
+            <option value={REPORT_INDEX_CLOSING}>{t('closing_logs_latest')}</option>
           </select>
 
           <select

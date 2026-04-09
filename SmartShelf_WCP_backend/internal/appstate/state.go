@@ -87,6 +87,9 @@ func (s *State) bootstrap(ctx context.Context) error {
 	if err := s.ensureBuckets(ctx); err != nil {
 		return err
 	}
+	if err := s.purgeExpiredDeviceLogs(ctx); err != nil {
+		return err
+	}
 	if s.cfg.SeedOnStart {
 		if err := s.seedData(ctx); err != nil {
 			return err

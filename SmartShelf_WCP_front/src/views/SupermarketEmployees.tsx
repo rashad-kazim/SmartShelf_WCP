@@ -26,11 +26,11 @@ const SupermarketEmployees = () => {
     const { data: users = [], isLoading, isFetching, error, refetch } = useGetSupermarketUsersQuery(filters, {
         refetchOnMountOrArgChange: true,
     });
-    const { data: countries = [] } = useGetCountriesQuery();
-    const { data: availableCities = [] } = useGetCitiesQuery(filters.country, {
+    const { data: countries = [] } = useGetCountriesQuery({ source: 'supermarket-users' });
+    const { data: availableCities = [] } = useGetCitiesQuery({ country: filters.country, source: 'supermarket-users' }, {
         skip: filters.country === 'all',
     });
-    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery(filters.city, {
+    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery({ city: filters.city }, {
         skip: filters.city === 'all',
     });
     const [deleteSupermarketUser, { isLoading: isDeleting }] = useDeleteSupermarketUserMutation();

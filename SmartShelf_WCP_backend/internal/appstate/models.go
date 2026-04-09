@@ -17,6 +17,11 @@ type PermissionSet struct {
 	Countries    []string `json:"countries"`
 }
 
+type CountryOption struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
 type DashboardRange string
 
 const (

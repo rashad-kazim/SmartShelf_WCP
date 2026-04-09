@@ -6,7 +6,7 @@ import {
   type FetchBaseQueryError,
 } from '@reduxjs/toolkit/query/react';
 import { logout, setCredentials } from '@/features/auth/authSlice';
-import { saveStoredAuth } from '@/features/auth/storage';
+import { registerCountries } from '@/i18n/ui';
 import type { DashboardQueryArgs, DashboardSummary, ActivityFeedItem } from '@/features/dashboard/types';
 import type { StoreFiltersState } from '@/features/stores/types';
 import type { Device, InstallationFormData } from '@/features/store-workflow/types';
@@ -15,6 +15,7 @@ import type {
   AuthResponse,
   CompanyUser,
   CompleteInstallationResult,
+  CountryOption,
   DeviceLogRecord,
   DeviceLogsQueryArgs,
   InstallationDraftResponse,
@@ -43,16 +44,25 @@ type PaginatedResult<T> = {
   meta: PaginationMeta;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8080';
+type ReferenceSource = 'all' | 'stores' | 'company-users' | 'supermarket-users';
+type CountryQueryArg = {
+  source?: ReferenceSource;
+};
+type CityQueryArg = {
+  country: string;
+  source?: ReferenceSource;
+};
+type SupermarketQueryArg = {
+  city: string;
+};
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
+const API_BASE_PREFIX = API_BASE_URL ? `${API_BASE_URL}/api/v1` : '/api/v1';
 
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: `${API_BASE_URL}/api/v1`,
-  prepareHeaders: (headers, { getState }) => {
-    const state = getState() as { auth?: { token?: string | null } };
-    const token = state.auth?.token;
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
+  baseUrl: API_BASE_PREFIX,
+  credentials: 'include',
+  prepareHeaders: (headers) => {
     headers.set('Content-Type', 'application/json');
     return headers;
   },
@@ -64,22 +74,11 @@ const baseQuery: BaseQueryFn<string | FetchArgs, ApiEnvelope<unknown>, FetchBase
   extraOptions,
 ) => {
   let result = await rawBaseQuery(args, api, extraOptions);
-  const state = api.getState() as {
-    auth?: {
-      token?: string | null;
-      refreshToken?: string | null;
-      user?: AuthResponse['user'] | null;
-    };
-  };
-
-  if (result.error?.status === 401 && state.auth?.refreshToken) {
+  if (result.error?.status === 401) {
     const refreshResult = await rawBaseQuery(
       {
         url: '/auth/refresh',
         method: 'POST',
-        body: {
-          refresh_token: state.auth.refreshToken,
-        },
       },
       api,
       extraOptions,
@@ -89,11 +88,8 @@ const baseQuery: BaseQueryFn<string | FetchArgs, ApiEnvelope<unknown>, FetchBase
       const refreshEnvelope = refreshResult.data as ApiEnvelope<AuthResponse>;
       const authPayload = {
         user: refreshEnvelope.data.user,
-        token: refreshEnvelope.data.access_token,
-        refreshToken: refreshEnvelope.data.refresh_token,
       };
       api.dispatch(setCredentials(authPayload));
-      saveStoredAuth(authPayload);
       result = await rawBaseQuery(args, api, extraOptions);
     } else {
       api.dispatch(logout());
@@ -138,20 +134,18 @@ export const api = createApi({
       transformResponse: (response: ApiEnvelope<AuthResponse>) => unwrapData(response),
     }),
 
-    refreshAuth: builder.mutation<AuthResponse, { refresh_token: string }>({
-      query: (body) => ({
+    refreshAuth: builder.mutation<AuthResponse, void>({
+      query: () => ({
         url: '/auth/refresh',
         method: 'POST',
-        body,
       }),
       transformResponse: (response: ApiEnvelope<AuthResponse>) => unwrapData(response),
     }),
 
-    logoutAuth: builder.mutation<{ status: string }, { refresh_token?: string } | void>({
-      query: (body) => ({
+    logoutAuth: builder.mutation<{ status: string }, void>({
+      query: () => ({
         url: '/auth/logout',
         method: 'POST',
-        body,
       }),
       transformResponse: (response: ApiEnvelope<{ status: string }>) => unwrapData(response),
     }),
@@ -178,22 +172,36 @@ export const api = createApi({
       invalidatesTags: [{ type: 'Preference', id: 'ME' }, { type: 'Auth', id: 'ME' }],
     }),
 
-    getCountries: builder.query<string[], void>({
-      query: () => '/reference/countries',
-      transformResponse: (response: ApiEnvelope<string[]>) => unwrapData(response),
-      providesTags: [{ type: 'Reference', id: 'COUNTRIES' }],
+    getCountries: builder.query<CountryOption[], CountryQueryArg | void>({
+      query: (arg) => {
+        const params = new URLSearchParams();
+        if (arg?.source) params.set('source', arg.source);
+        const query = params.toString();
+        return query ? `/reference/countries?${query}` : '/reference/countries';
+      },
+      transformResponse: (response: ApiEnvelope<CountryOption[]>) => {
+        const items = unwrapData(response);
+        registerCountries(items);
+        return items;
+      },
+      providesTags: (_result, _error, arg) => [{ type: 'Reference', id: `COUNTRIES-${arg?.source ?? 'stores'}` }],
     }),
 
-    getCities: builder.query<string[], string>({
-      query: (country) => `/reference/cities?country=${encodeURIComponent(country)}`,
+    getCities: builder.query<string[], CityQueryArg>({
+      query: ({ country, source }) => {
+        const params = new URLSearchParams();
+        if (country) params.set('country', country);
+        if (source) params.set('source', source);
+        return `/reference/cities?${params.toString()}`;
+      },
       transformResponse: (response: ApiEnvelope<string[]>) => unwrapData(response),
-      providesTags: (_result, _error, country) => [{ type: 'Reference', id: `CITIES-${country}` }],
+      providesTags: (_result, _error, arg) => [{ type: 'Reference', id: `CITIES-${arg.source ?? 'stores'}-${arg.country}` }],
     }),
 
-    getSupermarkets: builder.query<string[], string>({
-      query: (city) => `/reference/supermarkets?city=${encodeURIComponent(city)}`,
+    getSupermarkets: builder.query<string[], SupermarketQueryArg>({
+      query: ({ city }) => `/reference/supermarkets?city=${encodeURIComponent(city)}`,
       transformResponse: (response: ApiEnvelope<string[]>) => unwrapData(response),
-      providesTags: (_result, _error, city) => [{ type: 'Reference', id: `SUPERMARKETS-${city}` }],
+      providesTags: (_result, _error, arg) => [{ type: 'Reference', id: `SUPERMARKETS-${arg.city}` }],
     }),
 
     getDashboardSummary: builder.query<DashboardSummary, Partial<DashboardQueryArgs> | void>({

@@ -19,6 +19,4 @@ export interface AuthUser {
 
 export interface AuthCredentials {
   user: AuthUser;
-  token: string;
-  refreshToken: string;
 }

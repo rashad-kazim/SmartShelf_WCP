@@ -139,14 +139,15 @@ func (s *State) DeviceLogs(ctx context.Context, storeID int64, filter DeviceLogF
 
 	conditions := ` WHERE store_id = $1`
 	values := []any{storeID}
+	conditions += ` AND logged_at >= NOW() - INTERVAL '30 days'`
 
 	if strings.TrimSpace(filter.Date) != "" {
 		values = append(values, filter.Date)
 		conditions += ` AND DATE(logged_at) = $` + fmt.Sprintf("%d", len(values))
 	}
 	if strings.TrimSpace(filter.PacketIndex) != "" && !strings.EqualFold(filter.PacketIndex, "all") {
-		values = append(values, filter.PacketIndex)
-		conditions += ` AND report_index = $` + fmt.Sprintf("%d", len(values))
+		values = append(values, reportIndexVariants(filter.PacketIndex))
+		conditions += ` AND report_index = ANY($` + fmt.Sprintf("%d", len(values)) + `::text[])`
 	}
 	switch strings.TrimSpace(filter.BatteryStatus) {
 	case "<25":
@@ -207,6 +208,7 @@ func (s *State) DeviceLogs(ctx context.Context, storeID int64, filter DeviceLogF
 		); err != nil {
 			return nil, 0, fmt.Errorf("device logs scan: %w", err)
 		}
+		item.ReportIndex = normalizeReportIndex(item.ReportIndex)
 		items = append(items, item)
 	}
 

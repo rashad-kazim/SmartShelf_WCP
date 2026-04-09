@@ -1,6 +1,6 @@
  'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,7 +15,8 @@ import {
   Edit2,
   Trash2,
   Save,
-  PlusCircle
+  PlusCircle,
+  LoaderCircle
 } from 'lucide-react';
 import {
   useGetCitiesQuery,
@@ -26,6 +27,10 @@ import {
 } from '@/api/api';
 import QueryErrorState from '@/components/feedback/QueryErrorState';
 import FormLoading from '@/components/loading/FormLoading';
+import { InstalledDevicesPanel } from '@/components/store-workflow/InstalledDevicesPanel';
+import { translateCity, translateCountry } from '@/i18n/ui';
+import { getApiErrorMessage } from '@/utils/api-error';
+import { requiredLabel, requiredMessage } from '@/utils/form-fields';
 import { cn } from '../utils/cn';
 import { useAppSelector } from '../store/hooks';
 import {
@@ -37,23 +42,13 @@ import {
   createEditStoreFormData,
   createDraftDevice,
 } from '@/features/store-workflow/helpers';
-import type { Device, DeviceLifecycleStatus, EditStoreFormData } from '@/features/store-workflow/types';
-
-const deviceStatusMeta: Record<DeviceLifecycleStatus, string> = {
-  pending: 'bg-slate-100 text-slate-700',
-  paired: 'bg-brand-primary/10 text-brand-primary',
-  active: 'bg-success/10 text-success',
-  offline: 'bg-danger/10 text-danger',
-  unhealthy: 'bg-warning/15 text-warning',
-  revoked: 'bg-danger text-white',
-  decommissioned: 'bg-slate-200 text-slate-700',
-};
+import type { Device, EditStoreFormData } from '@/features/store-workflow/types';
 
 export default function EditStoreWorkflow() {
   const params = useParams<{ storeId: string | string[] }>();
   const storeId = Array.isArray(params?.storeId) ? params.storeId[0] : params?.storeId;
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAppSelector((state) => state.auth);
   const isAdmin = user?.role === 'Administrator';
 
@@ -63,8 +58,9 @@ export default function EditStoreWorkflow() {
   const [formData, setFormData] = useState<EditStoreFormData>(createEditStoreFormData);
   const [devices, setDevices] = useState<Device[]>([]);
   const [currentDevice, setCurrentDevice] = useState<Partial<Device>>({});
-  const deviceListRef = useRef<HTMLDivElement>(null);
-  const visibleDevices = [...devices].sort((left, right) => right.id - left.id);
+  const [actionError, setActionError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [deviceErrors, setDeviceErrors] = useState<Record<string, string>>({});
   const {
     data: configuration,
     isLoading: isConfigurationLoading,
@@ -73,10 +69,19 @@ export default function EditStoreWorkflow() {
   } = useGetStoreConfigurationQuery(storeId ?? '', {
     skip: !storeId,
   });
-  const { data: countries = [] } = useGetCountriesQuery();
-  const { data: availableCities = [] } = useGetCitiesQuery(formData.country, {
+  const { data: countries = [] } = useGetCountriesQuery({ source: 'all' });
+  const { data: availableCities = [] } = useGetCitiesQuery({ country: formData.country, source: 'all' }, {
     skip: !formData.country,
   });
+  const currentLanguage = (i18n.resolvedLanguage ?? 'en').toLowerCase();
+  const countryOptions = useMemo(
+    () =>
+      countries.map((country) => ({
+        value: country.name,
+        label: translateCountry(t, country.name, currentLanguage),
+      })),
+    [countries, currentLanguage, t],
+  );
   const [updateStore, { isLoading: isUpdatingStore }] = useUpdateStoreMutation();
   const [replaceStoreDevices, { isLoading: isSavingDevices }] = useReplaceStoreDevicesMutation();
 
@@ -86,6 +91,9 @@ export default function EditStoreWorkflow() {
     }
     setFormData(configuration.store);
     setDevices(configuration.devices);
+    setActionError('');
+    setFieldErrors({});
+    setDeviceErrors({});
   }, [configuration]);
 
   // Unsaved changes warning
@@ -99,13 +107,6 @@ export default function EditStoreWorkflow() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
-
-  // Auto-scroll devices list
-  useEffect(() => {
-    if (deviceListRef.current) {
-      deviceListRef.current.scrollTop = 0;
-    }
-  }, [devices]);
 
   const steps = [
     { id: 1, title: t('store_information'), icon: MapPin },
@@ -129,6 +130,36 @@ export default function EditStoreWorkflow() {
       return newData;
     });
     setIsDirty(true);
+    setFieldErrors((previous) => ({ ...previous, [name]: '' }));
+  };
+
+  const validateStoreForm = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!formData.country.trim()) nextErrors.country = requiredMessage(t('country'));
+    if (!formData.city.trim()) nextErrors.city = requiredMessage(t('city'));
+    if (!formData.storeName.trim()) nextErrors.storeName = requiredMessage(t('store_name'));
+    if (formData.isBranch && !formData.branchName.trim()) nextErrors.branchName = requiredMessage(t('branch_name'));
+    if (!formData.address.trim()) nextErrors.address = requiredMessage(t('store_address'));
+    if (!formData.allDayOpen && !formData.openingHour.trim()) nextErrors.openingHour = requiredMessage(t('opening_hour'));
+    if (!formData.allDayOpen && !formData.closingHour.trim()) nextErrors.closingHour = requiredMessage(t('closing_hour'));
+    if (!formData.ownerName.trim()) nextErrors.ownerName = requiredMessage(t('owner_name'));
+    if (!formData.ownerSurname.trim()) nextErrors.ownerSurname = requiredMessage(t('owner_surname'));
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const validateDeviceForm = () => {
+    const nextErrors: Record<string, string> = {};
+    if (!currentDevice.screenSize?.trim()) nextErrors.screenSize = requiredMessage(t('screen_size'));
+    if (!currentDevice.allDayWork && !currentDevice.awakeTime?.trim()) nextErrors.awakeTime = requiredMessage(t('awake_time'));
+    if (!currentDevice.allDayWork && !currentDevice.sleepTime?.trim()) nextErrors.sleepTime = requiredMessage(t('sleep_time'));
+    if (!currentDevice.gatewayIp?.trim()) nextErrors.gatewayIp = requiredMessage(t('gateway_ip'));
+    if (!currentDevice.gatewayPort?.trim()) nextErrors.gatewayPort = requiredMessage(t('gateway_port'));
+    if (!currentDevice.gatewayEndpoint?.trim()) nextErrors.gatewayEndpoint = requiredMessage(t('gateway_endpoint'));
+    if (!currentDevice.wifiSsid?.trim()) nextErrors.wifiSsid = requiredMessage(t('wifi_ssid'));
+    if (!currentDevice.wifiPassword?.trim()) nextErrors.wifiPassword = requiredMessage(t('wifi_password'));
+    setDeviceErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleNext = () => {
@@ -146,10 +177,19 @@ export default function EditStoreWorkflow() {
     if (!storeId) {
       return;
     }
-    await updateStore({ storeId, payload: formData }).unwrap();
-    await replaceStoreDevices({ storeId, devices }).unwrap();
-    setIsDirty(false);
-    router.push('/stores/edit');
+    setActionError('');
+    if (!validateStoreForm()) {
+      setCurrentStep(1);
+      return;
+    }
+    try {
+      await updateStore({ storeId, payload: formData }).unwrap();
+      await replaceStoreDevices({ storeId, devices }).unwrap();
+      setIsDirty(false);
+      router.push('/stores/edit');
+    } catch (error) {
+            setActionError(getApiErrorMessage(error, t('something_went_wrong'), t));
+    }
   };
 
   const handleAddNewDeviceClick = () => {
@@ -162,10 +202,11 @@ export default function EditStoreWorkflow() {
       espToken: 'shared_store_device_token',
     }));
     setIsDeviceFormVisible(true);
+    setDeviceErrors({});
   };
 
   const handleSaveDevice = () => {
-    if (!currentDevice.id) return;
+    if (!currentDevice.id || !validateDeviceForm()) return;
 
     const updatedDevicesList = [...devices];
     const existingIndex = devices.findIndex(d => d.id === currentDevice.id);
@@ -179,16 +220,19 @@ export default function EditStoreWorkflow() {
     setIsDirty(true);
     setIsDeviceFormVisible(false);
     setCurrentDevice({});
+    setDeviceErrors({});
   };
 
   const handleEditDevice = (device: Device) => {
     setCurrentDevice({ ...device });
     setIsDeviceFormVisible(true);
+    setDeviceErrors({});
   };
   
   const handleCancelEdit = () => {
     setIsDeviceFormVisible(false);
     setCurrentDevice({});
+    setDeviceErrors({});
   };
 
   const handleDeleteDevice = (id: number) => {
@@ -265,8 +309,8 @@ export default function EditStoreWorkflow() {
                     className="w-full px-4 py-3 rounded-xl bg-surface-muted border border-border focus:ring-2 focus:ring-brand-primary/50 outline-none disabled:opacity-50"
                     >
                       <option value="">{t('all_countries')}</option>
-                      {countries.map((country) => (
-                        <option key={country} value={country}>{t(country === 'UK' ? 'united_kingdom' : country.toLowerCase())}</option>
+                      {countryOptions.map((country) => (
+                        <option key={country.value} value={country.value}>{country.label}</option>
                       ))}
                     </select>
                 </div>
@@ -281,7 +325,7 @@ export default function EditStoreWorkflow() {
                   >
                     <option value="">{t('select_city')}</option>
                     {availableCities.map((city) => (
-                      <option key={city} value={city}>{t(city.toLowerCase())}</option>
+                      <option key={city} value={city}>{translateCity(t, city)}</option>
                     ))}
                   </select>
                 </div>
@@ -410,75 +454,13 @@ export default function EditStoreWorkflow() {
                 <h2 className="text-2xl font-bold">{t('device_setup')}</h2>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-xl font-bold text-left">{t('installed_devices')}</h3>
-                
-                {devices.length > 0 && (
-                  <div 
-                    ref={deviceListRef}
-                    className="flex max-h-[23rem] flex-col gap-4 overflow-y-auto pr-2 text-left"
-                  >
-                    {visibleDevices.map(device => (
-                      <div key={device.id} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-lg text-slate-900">ID: {device.id}</span>
-                            <span className={cn('px-3 py-1 text-xs font-bold rounded-full', deviceStatusMeta[device.status])}>
-                              {t(device.status)}
-                            </span>
-                            <span className="px-3 py-1 bg-blue-100 text-blue-500 text-xs font-bold rounded-full">
-                              {device.screenSize || t('not_available')}
-                            </span>
-                          </div>
-                          <div className="flex gap-4">
-                            <button onClick={() => handleEditDevice(device)} className="text-blue-500 hover:text-blue-600 transition-colors cursor-pointer">
-                              <Edit2 size={18} />
-                            </button>
-                            <button onClick={() => handleDeleteDevice(device.id)} className="text-red-500 hover:text-red-600 transition-colors cursor-pointer">
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400 font-medium">
-                          <div className="flex items-center gap-2">
-                            <MapPin size={16} />
-                            <span>{device.branchName ? `${device.storeName} / ${device.branchName}` : device.storeName}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Wifi size={16} />
-                            <span>{device.wifiSsid || t('no_ssid')}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} />
-                            <span>{device.allDayWork ? t('twenty_four_hours') : `${device.awakeTime || '09:00'} - ${device.sleepTime || '21:00'}`}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Server size={16} />
-                            <span>{device.gatewayIp}:{device.gatewayPort}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {(devices.length === 0 && !isDeviceFormVisible) && (
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center text-text-muted">
-                    {t('no_devices_added_yet')}
-                  </div>
-                )}
-
-                {!isDeviceFormVisible && (
-                    <div className="flex justify-center mt-6">
-                        <button
-                        onClick={handleAddNewDeviceClick}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white font-bold rounded-lg hover:bg-brand-primary/90 transition-all cursor-pointer"
-                        >
-                        <PlusCircle size={18} />
-                        {t('add_new_device')}
-                        </button>
-                    </div>
-                )}
+              <InstalledDevicesPanel
+                devices={devices}
+                isDeviceFormVisible={isDeviceFormVisible}
+                onAddDevice={handleAddNewDeviceClick}
+                onEditDevice={handleEditDevice}
+                onDeleteDevice={handleDeleteDevice}
+              />
 
                 {isDeviceFormVisible && (
                   <div className="bg-surface p-6 rounded-xl border border-border text-left space-y-6 mt-6 animate-in fade-in zoom-in-95">
@@ -657,7 +639,6 @@ export default function EditStoreWorkflow() {
                   </div>
                 )}
               </div>
-            </div>
           )}
         </div>
 

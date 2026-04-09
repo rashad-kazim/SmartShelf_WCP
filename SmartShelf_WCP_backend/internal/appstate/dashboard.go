@@ -17,11 +17,15 @@ func (s *State) Dashboard(ctx context.Context, args DashboardQueryArgs) (Dashboa
 		args.City = "all"
 	}
 
-	availableCountries, err := s.Countries(ctx)
+	availableCountries, err := s.Countries(ctx, "stores")
 	if err != nil {
 		return DashboardSummary{}, err
 	}
-	availableCities, err := s.Cities(ctx, args.Country)
+	availableCountryNames := make([]string, 0, len(availableCountries))
+	for _, country := range availableCountries {
+		availableCountryNames = append(availableCountryNames, country.Name)
+	}
+	availableCities, err := s.Cities(ctx, "stores", args.Country)
 	if err != nil {
 		return DashboardSummary{}, err
 	}
@@ -44,6 +48,20 @@ func (s *State) Dashboard(ctx context.Context, args DashboardQueryArgs) (Dashboa
 	var totalDevices int
 	if err = s.db.QueryRow(queryCtx, `SELECT COALESCE(SUM(device_count), 0) FROM stores WHERE deleted_at IS NULL`+conditions, values...).Scan(&totalDevices); err != nil {
 		return DashboardSummary{}, fmt.Errorf("dashboard devices: %w", err)
+	}
+
+	var totalStores int
+	if err = s.db.QueryRow(queryCtx, `SELECT COUNT(*) FROM stores WHERE deleted_at IS NULL`+conditions, values...).Scan(&totalStores); err != nil {
+		return DashboardSummary{}, fmt.Errorf("dashboard stores total: %w", err)
+	}
+
+	var coveredStores int
+	if err = s.db.QueryRow(
+		queryCtx,
+		`SELECT COUNT(*) FROM stores WHERE deleted_at IS NULL AND status = 'Active' AND device_count > 0`+conditions,
+		values...,
+	).Scan(&coveredStores); err != nil {
+		return DashboardSummary{}, fmt.Errorf("dashboard covered stores: %w", err)
 	}
 
 	var pendingAckCount int
@@ -71,11 +89,11 @@ func (s *State) Dashboard(ctx context.Context, args DashboardQueryArgs) (Dashboa
 		AddedStoresTrend:    addedStoresTrend,
 		CriticalErrorsTrend: criticalErrorsTrend,
 		Highlights: []DashboardHighlight{
-			{ID: "coverage", TitleKey: "dashboard_highlight_coverage", Value: fmt.Sprintf("%d%%", maxInt(72, minInt(98, 72+totalDevices))), Tone: "brand"},
+			{ID: "coverage", TitleKey: "dashboard_highlight_coverage", Value: fmt.Sprintf("%d%%", coveragePercentage(coveredStores, totalStores)), Tone: "brand"},
 			{ID: "alerts", TitleKey: "dashboard_highlight_pending_ack", Value: fmt.Sprintf("%d", pendingAckCount), Tone: toneFromPendingAck(pendingAckCount)},
 			{ID: "stores", TitleKey: "dashboard_highlight_store_growth", Value: fmt.Sprintf("+%d", storesAddedTotal), Tone: "success"},
 		},
-		AvailableCountries: availableCountries,
+		AvailableCountries: availableCountryNames,
 		AvailableCities:    availableCities,
 	}, nil
 }
@@ -207,4 +225,11 @@ func minInt(left, right int) int {
 		return left
 	}
 	return right
+}
+
+func coveragePercentage(coveredStores, totalStores int) int {
+	if totalStores <= 0 {
+		return 0
+	}
+	return int(float64(coveredStores) / float64(totalStores) * 100)
 }

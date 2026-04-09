@@ -2,7 +2,6 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { resources } from './locales';
 
-const LANGUAGE_STORAGE_KEY = 'smartshelf-language';
 const DEFAULT_LANGUAGE = 'en';
 
 const getInitialLanguage = () => {
@@ -10,7 +9,12 @@ const getInitialLanguage = () => {
     return DEFAULT_LANGUAGE;
   }
 
-  return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE;
+  const browserLanguage = window.navigator.language?.split('-')[0]?.toLowerCase();
+  if (browserLanguage && browserLanguage in resources) {
+    return browserLanguage === 'ge' ? 'az' : browserLanguage;
+  }
+
+  return DEFAULT_LANGUAGE;
 };
 
 const humanizeMissingKey = (key: string) =>
@@ -36,4 +40,6 @@ i18n
   });
 
 export default i18n;
-export { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY };
+export { DEFAULT_LANGUAGE };
+
+

@@ -1,13 +1,5 @@
 import type { DeviceFontSettings, DeviceLifecycleStatus, DeviceReportType } from './types';
 
-export const COUNTRY_OPTIONS = ['Germany', 'France', 'UK'] as const;
-
-export const CITY_OPTIONS_BY_COUNTRY: Record<string, string[]> = {
-  Germany: ['Berlin', 'Munich'],
-  France: ['Paris'],
-  UK: ['London'],
-};
-
 export const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => {
   const hour = index.toString().padStart(2, '0');
   return `${hour}:00`;
@@ -24,6 +16,16 @@ export const DEVICE_STATUS_OPTIONS: DeviceLifecycleStatus[] = [
   'revoked',
   'decommissioned',
 ];
+
+export const DEVICE_STATUS_META: Record<DeviceLifecycleStatus, string> = {
+  pending: 'bg-slate-100 text-slate-700',
+  paired: 'bg-brand-primary/10 text-brand-primary',
+  active: 'bg-success/10 text-success',
+  offline: 'bg-danger/10 text-danger',
+  unhealthy: 'bg-warning/15 text-warning',
+  revoked: 'bg-danger text-white',
+  decommissioned: 'bg-slate-200 text-slate-700',
+};
 
 export const DEVICE_REPORT_TYPE_OPTIONS: DeviceReportType[] = ['scheduled', 'alert', 'handshake'];
 

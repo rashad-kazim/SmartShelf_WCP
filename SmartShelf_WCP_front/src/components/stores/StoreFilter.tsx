@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
+import type { CountryOption } from '@/api/contracts';
 import type { AppliedStoreFilter, StoreFiltersState } from '@/features/stores/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { translateCity, translateCountry, translateFilterValue, translateWorkpla
 interface StoreFilterProps {
     filters: StoreFiltersState;
     setFilters: React.Dispatch<React.SetStateAction<StoreFiltersState>>;
-    countries: readonly string[];
+    countries: readonly CountryOption[];
     availableCities: string[];
     availableSupermarkets: string[];
     handleResetFilters: () => void;
@@ -32,7 +33,17 @@ const StoreFilter = ({
     removeFilter,
     isRefreshing = false
 }: StoreFilterProps) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const currentLanguage = (i18n.resolvedLanguage ?? 'en').toLowerCase();
+    const sortedCountries = [...countries].sort((left, right) =>
+        translateCountry(t, left.name, currentLanguage).localeCompare(translateCountry(t, right.name, currentLanguage), currentLanguage),
+    );
+    const sortedCities = [...availableCities].sort((left, right) =>
+        translateCity(t, left).localeCompare(translateCity(t, right), currentLanguage),
+    );
+    const sortedSupermarkets = [...availableSupermarkets].sort((left, right) =>
+        translateWorkplace(t, left).localeCompare(translateWorkplace(t, right), currentLanguage),
+    );
     const isCountrySelected = filters.country !== 'all';
     const isCitySelected = filters.city !== 'all';
     const isCityDisabled = !isCountrySelected;
@@ -71,8 +82,8 @@ const StoreFilter = ({
                     <Label htmlFor="country" className="mb-2 block cursor-pointer">{t('country')}</Label>
                     <Select id="country" name="country" onChange={handleInputChange} value={filters.country} className="rounded-lg bg-background">
                         <option value="all">{t('all_countries')}</option>
-                        {countries.map((country) => (
-                            <option key={country} value={country}>{translateCountry(t, country)}</option>
+                        {sortedCountries.map((country) => (
+                            <option key={country.code || country.name} value={country.name}>{translateCountry(t, country.name, currentLanguage)}</option>
                         ))}
                     </Select>
                 </div>
@@ -82,7 +93,7 @@ const StoreFilter = ({
                     <Label htmlFor="city" className="mb-2 block cursor-pointer">{t('city')}</Label>
                     <Select id="city" name="city" onChange={handleInputChange} value={filters.city} disabled={isCityDisabled} className="rounded-lg bg-background disabled:bg-muted/50">
                         <option value="all">{t('all_cities')}</option>
-                        {availableCities.map((city) => (
+                        {sortedCities.map((city) => (
                             <option key={city} value={city}>{translateCity(t, city)}</option>
                         ))}
                     </Select>
@@ -93,7 +104,7 @@ const StoreFilter = ({
                      <Label htmlFor="supermarket" className="mb-2 block cursor-pointer">{t('supermarket')}</Label>
                      <Select id="supermarket" name="supermarket" onChange={handleInputChange} value={filters.supermarket} disabled={isSupermarketDisabled} className="rounded-lg bg-background disabled:bg-muted/50">
                         <option value="all">{t('all_supermarkets')}</option>
-                        {availableSupermarkets.map((supermarket) => (
+                        {sortedSupermarkets.map((supermarket) => (
                             <option key={supermarket} value={supermarket}>{translateWorkplace(t, supermarket)}</option>
                         ))}
                     </Select>
@@ -101,7 +112,7 @@ const StoreFilter = ({
 
                 {/* Reset Button */}
                 <div className="w-full">
-                    <Button onClick={handleResetFilters} className="w-full rounded-lg text-sm">{t('reset_filters')}</Button>
+                    <Button onClick={handleResetFilters} className="h-12 w-full rounded-lg text-sm">{t('reset_filters')}</Button>
                 </div>
             </div>
 

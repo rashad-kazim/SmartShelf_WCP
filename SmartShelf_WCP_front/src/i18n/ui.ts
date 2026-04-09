@@ -1,18 +1,20 @@
 import type { TFunction } from 'i18next';
+import i18n from './config';
+
+const countryCodeRegistry = new Map<string, string>();
+
+const LOCALE_MAP: Record<string, string> = {
+  en: 'en',
+  tr: 'tr',
+  ru: 'ru',
+  az: 'az',
+  pl: 'pl',
+};
 
 const COUNTRY_KEYS: Record<string, string> = {
   Germany: 'germany',
   France: 'france',
   UK: 'united_kingdom',
-};
-
-const CITY_KEYS: Record<string, string> = {
-  Berlin: 'berlin',
-  Munich: 'munich',
-  Paris: 'paris',
-  Lyon: 'lyon',
-  London: 'london',
-  Manchester: 'manchester',
 };
 
 const ROLE_KEYS: Record<string, string> = {
@@ -34,9 +36,23 @@ const WORKPLACE_KEYS: Record<string, string> = {
 };
 
 const PACKET_KEYS: Record<string, string> = {
-  'Opening Logs': 'opening_logs',
-  'Middle Logs': 'middle_logs',
-  'Closing Logs': 'closing_logs',
+  opening: 'opening_logs',
+  middle: 'middle_logs',
+  closing: 'closing_logs',
+};
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: 'GB',
+  'united kingdom': 'GB',
+};
+
+const normalizeCountryKey = (value: string) => value.trim().toLowerCase();
+
+const resolveLocale = (locale?: string) => {
+  const normalizedLocale = (locale ?? i18n.resolvedLanguage ?? i18n.language ?? 'en')
+    .toLowerCase()
+    .split('-')[0];
+  return LOCALE_MAP[normalizedLocale] ?? normalizedLocale ?? 'en';
 };
 
 const translateFromMap = (t: TFunction, value: string, keyMap: Record<string, string>) => {
@@ -48,11 +64,33 @@ const translateFromMap = (t: TFunction, value: string, keyMap: Record<string, st
   return translationKey ? t(translationKey, value) : value;
 };
 
-export const translateCountry = (t: TFunction, country: string) =>
-  translateFromMap(t, country, COUNTRY_KEYS);
+export const registerCountries = (countries: Array<{ code: string; name: string }>) => {
+  countries.forEach((country) => {
+    if (!country.code || !country.name) {
+      return;
+    }
+    countryCodeRegistry.set(normalizeCountryKey(country.name), country.code.toUpperCase());
+  });
+};
 
-export const translateCity = (t: TFunction, city: string) =>
-  translateFromMap(t, city, CITY_KEYS);
+export const translateCountry = (t: TFunction, country: string, locale?: string) => {
+  if (!country) {
+    return country;
+  }
+
+  const currentLanguage = resolveLocale(locale);
+  const regionCode = countryCodeRegistry.get(normalizeCountryKey(country)) ?? COUNTRY_ALIASES[normalizeCountryKey(country)];
+  if (regionCode && typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined') {
+    const translatedCountry = new Intl.DisplayNames([currentLanguage], { type: 'region' }).of(regionCode);
+    if (translatedCountry) {
+      return translatedCountry;
+    }
+  }
+
+  return translateFromMap(t, country, COUNTRY_KEYS);
+};
+
+export const translateCity = (_t: TFunction, city: string) => city;
 
 export const translateRole = (t: TFunction, role: string) =>
   translateFromMap(t, role, ROLE_KEYS);
@@ -81,3 +119,4 @@ export const translateFilterValue = (
 
   return translateWorkplace(t, value);
 };
+

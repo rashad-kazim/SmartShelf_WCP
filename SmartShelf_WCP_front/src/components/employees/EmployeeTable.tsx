@@ -59,9 +59,17 @@ const EmployeeTable = ({ users, handleDeleteUser, editPathPrefix = '/user/edit',
                              <TableRow key={user.id}>
                                 <TableCell>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 shrink-0">
-                                            {getInitials(user.name, user.surname)}
-                                        </div>
+                                        {user.avatar ? (
+                                            <img
+                                                src={user.avatar}
+                                                alt={`${user.name} ${user.surname}`}
+                                                className="w-10 h-10 rounded-full object-cover shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 shrink-0">
+                                                {getInitials(user.name, user.surname)}
+                                            </div>
+                                        )}
                                         <div>
                                             <div className="font-bold text-text-primary">{user.name} {user.surname}</div>
                                             <div className="text-text-muted">{user.email}</div>
@@ -101,3 +109,5 @@ const EmployeeTable = ({ users, handleDeleteUser, editPathPrefix = '/user/edit',
 };
 
 export default EmployeeTable;
+
+

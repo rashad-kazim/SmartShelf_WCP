@@ -1,37 +1,37 @@
 # SmartShelf WCP Backend
 
-Bu klasör, SmartShelf admin paneli için baslayan backend iskeletini içerir.
+This folder contains the starting backend skeleton for the SmartShelf admin panel.
 
-Ilk fazda özellikle su ihtiyaçlar hedeflenmistir:
+In the first phase, the following needs are specifically targeted:
 
-- Auth baslangiç akisi
-- Dashboard summary ve activity feed
-- Stores, Layer 2 summary ve device logs read API'leri
-- Notifications API'leri ve SSE stream baslangici
-- Company/Supermarket users listeleme ve detay akisi
-- Frontend ile hizali response envelope yapisi
+- Auth initial flow
+- Dashboard summary and activity feed
+- Stores, Layer 2 summary and device logs read APIs
+- Notifications APIs and SSE stream start
+- Company/Supermarket users listing and detail flow
+- Response envelope structure aligned with frontend
 
-Notlar:
+Notes:
 
-- Export endpoint'leri bilinçli olarak eklenmedi.
-- ClickHouse bu fazda özellikle devre disi birakildi; simdilik kurulum veya entegrasyon yapilmayacak.
-- ClickHouse yerine ileride baglanabilecek hook'lar düsünülerek mimari modüler tutuldu.
-- Token güvenligi için hedef davranis: token ilk üretimde bir kez düz metin gösterilecek, ardindan sadece hash saklanacak.
-- `POST /api/v1/installation-drafts/{id}/complete` için `Idempotency-Key` zorunlu olacak.
-- Telemetry loglarinin sicak veri penceresi 30 gün olacak; eski veriler daha sonra MinIO/S3 arsiv worker'ina tasinacak.
-- Firmware rollout katmaninda canary ve rollback kurallari sonraki fazda eklenecek.
-- Simdilik in-memory seed data kullaniliyor; amaç route sözlesmesini erken netlestirmek.
+- Export endpoints were deliberately not added.
+- ClickHouse is specifically disabled in this phase; no installation or integration will be done for now.
+- The architecture is kept modular by thinking of hooks that can be connected later instead of ClickHouse.
+- Target behavior for token security: token will be shown in plain text once at first production, then only hash will be stored.
+- `Idempotency-Key` will be mandatory for `POST /api/v1/installation-drafts/{id}/complete`.
+- The hot data window for telemetry logs will be 30 days; old data will later be moved to MinIO/S3 archive worker.
+- Canary and rollback rules in the firmware rollout layer will be added in the next phase.
+- For now, in-memory seed data is being used; the goal is to clarify the route contract early.
 
-## Çalistirma
+## Running
 
 ```bash
 go mod tidy
 go run ./cmd/api
 ```
 
-Sunucu varsayilan olarak `http://localhost:8080` üzerinde açilir.
+The server opens by default on `http://localhost:8080`.
 
-## Su Anda Açik Olan Baslangiç Endpoint'leri
+## Currently Open Initial Endpoints
 
 - `GET /healthz`
 - `GET /api/v1/health`

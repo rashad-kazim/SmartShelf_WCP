@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 type ButtonVariant =
@@ -13,6 +14,7 @@ type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  isLoading?: boolean;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -40,6 +42,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       variant = 'default',
       size = 'default',
       type = 'button',
+      isLoading = false,
+      children,
       ...props
     },
     ref
@@ -54,8 +58,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         sizeClasses[size],
         className
       )}
+      disabled={props.disabled || isLoading}
       {...props}
-    />
+    >
+      {isLoading ? <LoaderCircle size={18} className="animate-spin" /> : null}
+      {children}
+    </button>
   )
 );
 

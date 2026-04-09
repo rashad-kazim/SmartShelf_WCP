@@ -11,7 +11,6 @@ import { useAppSelector } from '../store/hooks';
 import { useAppDispatch } from '@/store/hooks';
 import PanelLoader from '@/components/loading/PanelLoader';
 import { logout, setCredentials, syncAuthUser, updatePreferences } from '@/features/auth/authSlice';
-import { clearStoredAuth, loadStoredAuth, saveStoredAuth } from '@/features/auth/storage';
 import type { UserPreferences } from '@/features/auth/types';
 
 interface AdminShellProps {
@@ -22,12 +21,12 @@ export default function AdminShell({ children }: AdminShellProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user, token, refreshToken } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAuthResolved, setIsAuthResolved] = useState(false);
   const { data: meData, error: meError } = useGetMeQuery(undefined, {
-    skip: !isAuthenticated || !token,
+    skip: isAuthResolved && !isAuthenticated,
   });
   const [persistPreferences] = useUpdatePreferencesMutation();
 
@@ -45,62 +44,38 @@ export default function AdminShell({ children }: AdminShellProps) {
   }, [user?.preferences]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      setIsAuthResolved(true);
+    if (!isAuthResolved) {
       return;
     }
-
-    const storedAuth = loadStoredAuth();
-    if (!storedAuth) {
-      setIsAuthResolved(true);
-      return;
-    }
-
-    dispatch(setCredentials(storedAuth));
-    setIsAuthResolved(true);
-  }, [dispatch, isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthResolved && !isAuthenticated) {
+    if (!isAuthenticated) {
       router.replace('/login');
     }
   }, [isAuthResolved, isAuthenticated, router]);
 
   useEffect(() => {
-    if (!meData || !token || !refreshToken) {
+    if (!meData) {
       return;
     }
 
+    dispatch(setCredentials({ user: meData.user }));
     dispatch(syncAuthUser(meData.user));
-    saveStoredAuth({
-      user: meData.user,
-      token,
-      refreshToken,
-    });
-  }, [dispatch, meData, refreshToken, token]);
+    setIsAuthResolved(true);
+  }, [dispatch, meData]);
 
   useEffect(() => {
-    if (!meError) {
+    if (meError && isAuthenticated) {
+      dispatch(logout());
+      setIsAuthResolved(true);
+      router.replace('/login');
       return;
     }
-
-    clearStoredAuth();
-    dispatch(logout());
-    router.replace('/login');
-  }, [dispatch, meError, router]);
+    if (meError && !isAuthenticated) {
+      setIsAuthResolved(true);
+    }
+  }, [dispatch, isAuthenticated, meError, router]);
 
   const handlePreferencesChange = async (nextPreferences: UserPreferences) => {
     dispatch(updatePreferences(nextPreferences));
-    if (user && token && refreshToken) {
-      saveStoredAuth({
-        user: {
-          ...user,
-          preferences: nextPreferences,
-        },
-        token,
-        refreshToken,
-      });
-    }
     try {
       await persistPreferences(nextPreferences).unwrap();
     } catch {
@@ -136,7 +111,11 @@ export default function AdminShell({ children }: AdminShellProps) {
     });
   };
 
-  if (!isAuthResolved || !isAuthenticated) {
+  if (!isAuthResolved || (!isAuthenticated && !meError)) {
+    return <PanelLoader minHeightClassName="min-h-screen" />;
+  }
+
+  if (!isAuthenticated) {
     return <PanelLoader minHeightClassName="min-h-screen" />;
   }
 

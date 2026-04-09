@@ -33,11 +33,11 @@ const StorePageLayout = ({ pageType, pageTitle }: StorePageLayoutProps) => {
     const { data: stores = [], isLoading, isFetching, error, refetch } = useGetStoresQuery(filters, {
         refetchOnMountOrArgChange: true,
     });
-    const { data: countries = [] } = useGetCountriesQuery();
-    const { data: availableCities = [] } = useGetCitiesQuery(filters.country, {
+    const { data: countries = [] } = useGetCountriesQuery({ source: 'stores' });
+    const { data: availableCities = [] } = useGetCitiesQuery({ country: filters.country, source: 'stores' }, {
         skip: filters.country === 'all',
     });
-    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery(filters.city, {
+    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery({ city: filters.city }, {
         skip: filters.city === 'all',
     });
     const [deleteStore, { isLoading: isDeleting }] = useDeleteStoreMutation();

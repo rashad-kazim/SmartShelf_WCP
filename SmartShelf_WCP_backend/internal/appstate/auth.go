@@ -5,14 +5,23 @@ import (
 	"fmt"
 )
 
-func (s *State) AuthenticateAdmin(ctx context.Context, email, password string) (AuthUser, bool, error) {
+type AdminAuthResult string
+
+const (
+	AdminAuthSuccess          AdminAuthResult = "success"
+	AdminAuthEmailNotFound    AdminAuthResult = "email_not_found"
+	AdminAuthWrongPassword    AdminAuthResult = "wrong_password"
+	AdminAuthForbiddenAccount AdminAuthResult = "forbidden_account"
+)
+
+func (s *State) AuthenticateAdmin(ctx context.Context, email, password string) (AuthUser, AdminAuthResult, error) {
 	queryCtx, cancel := withTimeout(ctx)
 	defer cancel()
 
 	const query = `
-		SELECT id, name, email, role, password_hash, permissions, all_countries, countries
+		SELECT id, name, email, role, password_hash, permissions, all_countries, countries, kind
 		FROM users
-		WHERE kind = 'admin' AND email = $1 AND deleted_at IS NULL
+		WHERE email = $1 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -25,22 +34,27 @@ func (s *State) AuthenticateAdmin(ctx context.Context, email, password string) (
 		permissions  []byte
 		allCountries bool
 		countries    []byte
+		kind         string
 	)
 
-	if err := s.db.QueryRow(queryCtx, query, email).Scan(&id, &name, &userEmail, &role, &passwordHash, &permissions, &allCountries, &countries); err != nil {
+	if err := s.db.QueryRow(queryCtx, query, email).Scan(&id, &name, &userEmail, &role, &passwordHash, &permissions, &allCountries, &countries, &kind); err != nil {
 		if isNoRows(err) {
-			return AuthUser{}, false, nil
+			return AuthUser{}, AdminAuthEmailNotFound, nil
 		}
-		return AuthUser{}, false, fmt.Errorf("select admin: %w", err)
+		return AuthUser{}, "", fmt.Errorf("select admin: %w", err)
+	}
+
+	if kind != "admin" {
+		return AuthUser{}, AdminAuthForbiddenAccount, nil
 	}
 
 	if !compareSecret(passwordHash, password) {
-		return AuthUser{}, false, nil
+		return AuthUser{}, AdminAuthWrongPassword, nil
 	}
 
 	preferences, err := s.PreferencesByUserID(queryCtx, id)
 	if err != nil {
-		return AuthUser{}, false, err
+		return AuthUser{}, "", err
 	}
 
 	return AuthUser{
@@ -54,7 +68,7 @@ func (s *State) AuthenticateAdmin(ctx context.Context, email, password string) (
 			Countries:    unmarshalStringList(countries),
 		},
 		Preferences: preferences,
-	}, true, nil
+	}, AdminAuthSuccess, nil
 }
 
 func (s *State) Admin(ctx context.Context) (AuthUser, error) {

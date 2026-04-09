@@ -4,9 +4,12 @@ import type { AuthUser, UserPreferences } from '@/features/auth/types';
 
 export type { AuthUser, UserPreferences, DashboardSummary, ActivityFeedItem, Device, InstallationFormData };
 
+export interface CountryOption {
+  code: string;
+  name: string;
+}
+
 export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
   user: AuthUser;
   permissions: string[];
   preferences: UserPreferences;
@@ -63,7 +66,7 @@ export interface DeviceLogRecord {
   battery: number;
   voltage: number;
   rssi: number;
-  report_index: 'Opening Logs' | 'Middle Logs' | 'Closing Logs';
+  report_index: 'opening' | 'middle' | 'closing';
   report_type: 'scheduled' | 'alert' | 'handshake';
   status_code: 0 | 101 | 102 | 103 | 104 | 105;
   soc_temp: number;

@@ -25,8 +25,8 @@ const CompanyEmployees = () => {
     const { data: users = [], isLoading, isFetching, error, refetch } = useGetCompanyUsersQuery(filters, {
         refetchOnMountOrArgChange: true,
     });
-    const { data: countries = [] } = useGetCountriesQuery();
-    const { data: availableCities = [] } = useGetCitiesQuery(filters.country, {
+    const { data: countries = [] } = useGetCountriesQuery({ source: 'company-users' });
+    const { data: availableCities = [] } = useGetCitiesQuery({ country: filters.country, source: 'company-users' }, {
         skip: filters.country === 'all',
     });
     const [deleteCompanyUser, { isLoading: isDeleting }] = useDeleteCompanyUserMutation();

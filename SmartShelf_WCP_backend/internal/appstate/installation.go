@@ -242,14 +242,6 @@ func (s *State) CompleteInstallation(ctx context.Context, draftID, idempotencyKe
 	}
 
 	_, err = tx.Exec(queryCtx, `
-		INSERT INTO activities (id, message_key, details_key, time_key, occurred_at)
-		VALUES ($1, 'device_connected_msg', 'log_esp32_prov_success', 'mins_ago', NOW())
-	`, "activity-"+uuid.NewString())
-	if err != nil {
-		return CompleteInstallationResult{}, fmt.Errorf("installation activity: %w", err)
-	}
-
-	_, err = tx.Exec(queryCtx, `
 		UPDATE installation_drafts
 		SET completed_at = NOW(), updated_at = NOW()
 		WHERE id = $1

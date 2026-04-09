@@ -12,7 +12,8 @@ import (
 
 func Register(router *gin.RouterGroup, state *appstate.State) {
 	router.GET("/countries", func(c *gin.Context) {
-		items, err := state.Countries(c.Request.Context())
+		source := strings.TrimSpace(c.DefaultQuery("source", "stores"))
+		items, err := state.Countries(c.Request.Context(), source)
 		if err != nil {
 			response.Failure(c, http.StatusInternalServerError, "countries_failed", err.Error())
 			return
@@ -21,8 +22,9 @@ func Register(router *gin.RouterGroup, state *appstate.State) {
 	})
 
 	router.GET("/cities", func(c *gin.Context) {
+		source := strings.TrimSpace(c.DefaultQuery("source", "stores"))
 		country := strings.TrimSpace(c.Query("country"))
-		items, err := state.Cities(c.Request.Context(), country)
+		items, err := state.Cities(c.Request.Context(), source, country)
 		if err != nil {
 			response.Failure(c, http.StatusInternalServerError, "cities_failed", err.Error())
 			return

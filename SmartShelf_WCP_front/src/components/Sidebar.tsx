@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { useLogoutAuthMutation } from '@/api/api';
+import { api, useLogoutAuthMutation } from '@/api/api';
 import {
   LayoutDashboard, 
   Store, 
   PlusCircle, 
   Cpu, 
+  Bell,
   Users, 
-  Settings, 
   LogOut,
   ChevronRight,
   User
@@ -17,13 +17,13 @@ import {
 import { cn } from '../utils/cn';
 import { logout } from '../features/auth/authSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { clearStoredAuth } from '@/features/auth/storage';
 
 export default function Sidebar({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { user, refreshToken } = useAppSelector((state) => state.auth);
+  const { user } = useAppSelector((state) => state.auth);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const [logoutAuth] = useLogoutAuthMutation();
@@ -38,11 +38,24 @@ export default function Sidebar({ isOpen, toggle }: { isOpen: boolean; toggle: (
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await logoutAuth().unwrap();
+    } catch {
+      // server logout may fail, local auth state still must reset
+    }
+
+    dispatch(api.util.resetApiState());
+    dispatch(logout());
+    router.replace('/login');
+  };
+
   const menuItems = [
     { icon: LayoutDashboard, label: t('dashboard'), path: '/' },
     { icon: Store, label: t('stores_branches'), path: '/stores' },
     { icon: PlusCircle, label: t('new_installation'), path: '/installation' },
     { icon: Cpu, label: t('firmware'), path: '/firmware' },
+    { icon: Bell, label: t('all_notifications'), path: '/notifications' },
     { icon: Users, label: t('user_roles'), path: '/users' },
   ];
 
@@ -100,11 +113,7 @@ export default function Sidebar({ isOpen, toggle }: { isOpen: boolean; toggle: (
             isOpen ? "left-4 right-4" : "left-4 w-48"
           )}>
             <button
-              onClick={() => {
-                void logoutAuth(refreshToken ? { refresh_token: refreshToken } : undefined);
-                clearStoredAuth();
-                dispatch(logout());
-              }}
+              onClick={() => void handleLogout()}
               className="w-full text-left px-4 py-3 text-sm text-danger hover:bg-danger/10 transition-colors flex items-center gap-3 cursor-pointer"
             >
               <LogOut size={18} />

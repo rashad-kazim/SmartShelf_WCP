@@ -1,9 +1,9 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Camera, PlusCircle, Save } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import FormLoading from '@/components/loading/FormLoading';
 import QueryErrorState from '@/components/feedback/QueryErrorState';
 import {
@@ -18,12 +18,14 @@ import type { SupermarketUser } from '@/api/contracts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
-import { translateCity, translateCountry, translateWorkplace } from '@/i18n/ui';
+import { UserAvatarPicker } from '@/components/users/UserAvatarPicker';
+import { UserIdentityFields } from '@/components/users/UserIdentityFields';
+import { translateCountry, translateWorkplace } from '@/i18n/ui';
+import { getApiErrorMessage } from '@/utils/api-error';
+import { requiredMessage } from '@/utils/form-fields';
 
 const UserForm = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const params = useParams<{ userId: string | string[] }>();
     const userId = Array.isArray(params?.userId) ? params.userId[0] : params?.userId;
     const router = useRouter();
@@ -34,19 +36,46 @@ const UserForm = () => {
         name: '', surname: '', email: '',
         role: 'Store Manager', country: '', city: '', workplace: ''
     });
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [formError, setFormError] = useState('');
     const [imagePreview, setImagePreview] = useState<SupermarketUser['avatar']>(null);
     const { data: selectedUser, isLoading: isUserLoading, error: userError, refetch } = useGetSupermarketUserByIdQuery(userId ?? '', {
         skip: !isEditing || !userId,
     });
     const [addSupermarketUser, { isLoading: isAddingUser }] = useAddSupermarketUserMutation();
     const [updateSupermarketUser, { isLoading: isUpdatingUser }] = useUpdateSupermarketUserMutation();
-    const { data: countries = [] } = useGetCountriesQuery();
-    const { data: availableCities = [] } = useGetCitiesQuery(formData.country, {
+    const currentLanguage = (i18n.resolvedLanguage ?? 'en').toLowerCase();
+    const { data: countries = [] } = useGetCountriesQuery({ source: 'all' });
+    const { data: availableCities = [], isFetching: isCitiesLoading } = useGetCitiesQuery({ country: formData.country, source: 'all' }, {
         skip: !formData.country,
     });
-    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery(formData.city, {
+    const { data: availableSupermarkets = [] } = useGetSupermarketsQuery({ city: formData.city }, {
         skip: !formData.city,
     });
+    const countryOptions = useMemo(
+        () => countries.map((country) => ({
+            value: country.name,
+            label: translateCountry(t, country.name, currentLanguage),
+            keywords: [country.name, country.code],
+        })),
+        [countries, t, currentLanguage],
+    );
+    const roleOptions = useMemo(
+        () => [
+            { value: 'Store Manager', label: t('store_manager') },
+            { value: 'Cashier', label: t('cashier') },
+            { value: 'Stock Keeper', label: t('stock_keeper') },
+        ],
+        [t],
+    );
+    const workplaceOptions = useMemo(
+        () =>
+            availableSupermarkets.map((supermarket) => ({
+                value: supermarket,
+                label: translateWorkplace(t, supermarket),
+            })),
+        [availableSupermarkets, t],
+    );
     const isSaving = isAddingUser || isUpdatingUser;
 
     useEffect(() => {
@@ -61,22 +90,43 @@ const UserForm = () => {
                 workplace: selectedUser.workplace,
             });
             setImagePreview(selectedUser.avatar);
+            setFieldErrors({});
+            setFormError('');
         }
     }, [isEditing, selectedUser]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        setFieldErrors((previous) => ({ ...previous, [name]: '' }));
     };
     
-    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value, city: '', workplace: '' }));
+    const handleCountryChange = (value: string) => {
+        setFormData(prev => ({ ...prev, country: value, city: '', workplace: '' }));
+        setFieldErrors((previous) => ({ ...previous, country: '', city: '', workplace: '' }));
     };
 
-    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value, workplace: '' }));
+    const handleCityChange = (value: string) => {
+        setFormData(prev => ({ ...prev, city: value, workplace: '' }));
+        setFieldErrors((previous) => ({ ...previous, city: '', workplace: '' }));
+    };
+
+    const handleWorkplaceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const { value } = e.target;
+        setFormData((prev) => ({ ...prev, workplace: value }));
+        setFieldErrors((previous) => ({ ...previous, workplace: '' }));
+    };
+
+    const validateForm = () => {
+        const nextErrors: Record<string, string> = {};
+        if (!formData.name.trim()) nextErrors.name = requiredMessage(t('name'));
+        if (!formData.surname.trim()) nextErrors.surname = requiredMessage(t('surname'));
+        if (!formData.email.trim()) nextErrors.email = requiredMessage(t('email'));
+        if (!formData.country.trim()) nextErrors.country = requiredMessage(t('country'));
+        if (!formData.city.trim()) nextErrors.city = requiredMessage(t('city'));
+        if (!formData.workplace.trim()) nextErrors.workplace = requiredMessage(t('workplace'));
+        setFieldErrors(nextErrors);
+        return Object.keys(nextErrors).length === 0;
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,19 +144,33 @@ const UserForm = () => {
 
     const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        setFormError('');
+
+        if (!validateForm()) {
+            return;
+        }
 
         const userPayload: Omit<SupermarketUser, 'id'> = {
             ...formData,
             avatar: imagePreview,
         };
 
-        if (isEditing) {
-            await updateSupermarketUser({ userId: userId!, userData: userPayload }).unwrap();
-        } else {
-            await addSupermarketUser(userPayload).unwrap();
-        }
+        try {
+            if (isEditing) {
+                await updateSupermarketUser({ userId: userId!, userData: userPayload }).unwrap();
+            } else {
+                await addSupermarketUser(userPayload).unwrap();
+            }
 
-        router.push('/supermarket-employees');
+            router.push('/supermarket-employees');
+        } catch (error) {
+            const message = getApiErrorMessage(error, t('something_went_wrong'), t);
+            if (message.toLowerCase().includes('email')) {
+                setFieldErrors((previous) => ({ ...previous, email: message }));
+            } else {
+                setFormError(message);
+            }
+        }
     };
 
     if (isEditing && isUserLoading) {
@@ -135,102 +199,54 @@ const UserForm = () => {
                     <CardTitle>{isEditing ? t('edit_user') : t('add_new_user')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-8">
+                {formError ? (
+                    <div className="rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+                        {formError}
+                    </div>
+                ) : null}
 
-                <div className="flex flex-col items-center gap-4 mb-8">
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleImageChange} 
-                        className="hidden"
-                        accept="image/*"
-                    />
-                    <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                        <div className="w-32 h-32 rounded-full bg-surface-muted border-2 border-dashed border-border flex flex-col items-center justify-center text-text-muted overflow-hidden group-hover:border-brand-primary transition-all">
-                            {imagePreview ? (
-                                <img src={imagePreview} alt={t('profile_preview')} className="w-full h-full object-cover" />
-                            ) : selectedUser?.avatar ? (
-                                <img src={selectedUser.avatar} alt={t('profile_picture')} className="w-full h-full object-cover" />
-                            ) : (
-                                <>
-                                    <Camera size={32} className="mb-2" />
-                                    <span className="text-xs font-bold">{t('profile_picture')}</span>
-                                </>
-                            )}
-                        </div>
-                        <div className="absolute bottom-0 right-0 p-2 bg-brand-primary text-white rounded-full shadow-lg">
-                            <PlusCircle size={16} />
-                        </div>
-                    </div>
-                    <p className="text-xs text-text-muted">{t('image_format_limit')}</p>
-                </div>
+                <UserAvatarPicker
+                    imagePreview={imagePreview}
+                    existingAvatar={selectedUser?.avatar ?? null}
+                    profilePictureLabel={t('profile_picture')}
+                    profilePreviewLabel={t('profile_preview')}
+                    imageFormatLimitLabel={t('image_format_limit')}
+                    fileInputRef={fileInputRef}
+                    onImageChange={handleImageChange}
+                />
 
-                {/* Form Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                    <div className="space-y-2">
-                        <Label>{t('name')}</Label>
-                        <Input name="name" value={formData.name} onChange={handleInputChange} type="text" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>{t('surname')}</Label>
-                        <Input name="surname" value={formData.surname} onChange={handleInputChange} type="text" />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <Label>{t('email')}</Label>
-                        <Input name="email" value={formData.email} onChange={handleInputChange} type="email" />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <Label>{t('role')}</Label>
-                        <Select name="role" value={formData.role} onChange={handleInputChange} className="bg-surface-muted">
-                            <option value="Store Manager">{t('store_manager')}</option>
-                            <option value="Cashier">{t('cashier')}</option>
-                            <option value="Stock Keeper">{t('stock_keeper')}</option>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>{t('country')}</Label>
-                        <Select name="country" value={formData.country} onChange={handleCountryChange} className="bg-surface-muted">
-                            <option value="">{t('select_country', 'Select Country')}</option>
-                            {countries.map((country) => (
-                                <option key={country} value={country}>{translateCountry(t, country)}</option>
-                            ))}
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>{t('city')}</Label>
-                        <Select name="city" value={formData.city} onChange={handleCityChange} disabled={!formData.country} className="bg-surface-muted">
-                            <option value="">{t('select_city', 'Select City')}</option>
-                            {availableCities.map((city) => (
-                                <option key={city} value={city}>{translateCity(t, city)}</option>
-                            ))}
-                        </Select>
-                    </div>
-                     <div className="md:col-span-2 space-y-2">
-                        <Label>{t('workplace', 'Workplace')}</Label>
-                        <Select name="workplace" value={formData.workplace} onChange={handleInputChange} disabled={!formData.city} className="bg-surface-muted">
-                            <option value="">{t('select_supermarket', 'Select Supermarket')}</option>
-                            {availableSupermarkets.map((supermarket) => (
-                                <option key={supermarket} value={supermarket}>{translateWorkplace(t, supermarket)}</option>
-                            ))}
-                        </Select>
-                    </div>
+                <UserIdentityFields
+                    t={t}
+                    locale={currentLanguage}
+                    formData={formData}
+                    fieldErrors={fieldErrors}
+                    countryOptions={countryOptions}
+                    availableCities={availableCities}
+                    roleOptions={roleOptions}
+                    onInputChange={handleInputChange}
+                    onCountryChange={handleCountryChange}
+                    onCityChange={handleCityChange}
+                    isCitiesLoading={isCitiesLoading}
+                    workplaceOptions={workplaceOptions}
+                    onWorkplaceChange={handleWorkplaceChange}
+                    workplaceDisabled={!formData.city}
+                />
 
-                    {/* Password Section */}
-                    <div className="md:col-span-2 pt-6 border-t border-border">
+                <div className="mx-auto max-w-4xl border-t border-border pt-6">
                         <h3 className="font-bold mb-1">{t('change_password')}</h3>
                         <p className="text-xs text-text-muted mb-4">{t('leave_blank_password')}</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Input type="password" placeholder={t('new_password')} />
                             <Input type="password" placeholder={t('repeat_password')} />
                         </div>
-                    </div>
                 </div>
 
                 <div className="flex justify-end gap-4 mt-8 max-w-4xl mx-auto">
                     <Button type="button" onClick={() => router.push('/supermarket-employees')} disabled={isSaving} variant="ghost">
                         {t('cancel')}
                     </Button>
-                    <Button type="submit" disabled={isSaving}>
-                        <Save size={20} />
+                    <Button type="submit" isLoading={isSaving}>
+                        {!isSaving ? <Save size={20} /> : null}
                         {isSaving ? t('saving', 'Saving...') : t('save_changes')}
                     </Button>
                 </div>

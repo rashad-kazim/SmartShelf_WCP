@@ -5,17 +5,16 @@ import { useTranslation } from 'react-i18next';
 import { useGetNotificationsQuery, useUpdatePreferencesMutation } from '@/api/api';
 import { cn } from '../utils/cn';
 import Logo from './Logo';
-import { DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY } from '@/i18n/config';
+import { DEFAULT_LANGUAGE } from '@/i18n/config';
 import NotificationsDropdown from '@/components/notifications/NotificationsDropdown';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updatePreferences } from '@/features/auth/authSlice';
-import { saveStoredAuth } from '@/features/auth/storage';
 
 const LANGUAGES = [
   { label: 'EN', value: 'en' },
   { label: 'TR', value: 'tr' },
   { label: 'RU', value: 'ru' },
-  { label: 'GE', value: 'ge' },
+  { label: 'AZ', value: 'az' },
   { label: 'PL', value: 'pl' },
 ];
 
@@ -28,8 +27,8 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
   const { i18n, t } = useTranslation();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const { user, token, refreshToken } = useAppSelector((state) => state.auth);
-  const currentLang = (i18n.resolvedLanguage ?? DEFAULT_LANGUAGE).toLowerCase();
+  const { user } = useAppSelector((state) => state.auth);
+  const currentLang = ((i18n.resolvedLanguage ?? DEFAULT_LANGUAGE).toLowerCase() === 'ge' ? 'az' : (i18n.resolvedLanguage ?? DEFAULT_LANGUAGE).toLowerCase());
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -69,17 +68,15 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
       return;
     }
 
-    const preferredLanguage = user.preferences.language.toLowerCase();
+    const preferredLanguage = user.preferences.language.toLowerCase() === 'ge' ? 'az' : user.preferences.language.toLowerCase();
     if (preferredLanguage !== currentLang) {
       void i18n.changeLanguage(preferredLanguage);
     }
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, preferredLanguage);
     document.documentElement.lang = preferredLanguage;
   }, [currentLang, i18n, user?.preferences.language]);
 
   useEffect(() => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8080';
-    if (!token || typeof window === 'undefined') {
+    if (!user || typeof window === 'undefined') {
       return;
     }
 
@@ -88,10 +85,8 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
 
     const startStream = async () => {
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/notifications/stream-token`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const response = await fetch('/api/v1/notifications/stream-token', {
+          credentials: 'include',
           signal: abortController.signal,
         });
         if (!response.ok) {
@@ -103,7 +98,7 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
           return;
         }
 
-        stream = new EventSource(`${apiBaseUrl}/api/v1/notifications/stream?stream_token=${encodeURIComponent(streamToken)}`);
+        stream = new EventSource(`/api/v1/notifications/stream?stream_token=${encodeURIComponent(streamToken)}`);
         stream.addEventListener('notification', () => {
           void refetchNotifications();
         });
@@ -121,11 +116,10 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
       abortController.abort();
       stream?.close();
     };
-  }, [refetchNotifications, token]);
+  }, [refetchNotifications, user]);
 
   const handleLanguageChange = async (language: string) => {
     await i18n.changeLanguage(language);
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
     document.documentElement.lang = language;
     if (user?.preferences) {
       const nextPreferences = {
@@ -133,16 +127,6 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
         language,
       };
       dispatch(updatePreferences(nextPreferences));
-      if (token && refreshToken) {
-        saveStoredAuth({
-          user: {
-            ...user,
-            preferences: nextPreferences,
-          },
-          token,
-          refreshToken,
-        });
-      }
       void persistPreferences(nextPreferences);
     }
     setIsLangOpen(false);
@@ -248,3 +232,4 @@ export default function Header({ isSidebarOpen, toggleSidebar, isDarkMode, toggl
     </header>
   );
 }
+

@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://127.0.0.1:3100',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -18,11 +18,11 @@ export default defineConfig({
       timeout: 180000,
     },
     {
-      command: 'npm.cmd run dev',
-      url: 'http://127.0.0.1:3000/login',
+      command: 'cmd /c npm.cmd run build && npx.cmd next start -p 3100',
+      url: 'http://127.0.0.1:3100/login',
       cwd: '.',
-      reuseExistingServer: true,
-      timeout: 180000,
+      reuseExistingServer: false,
+      timeout: 300000,
     },
   ],
 });

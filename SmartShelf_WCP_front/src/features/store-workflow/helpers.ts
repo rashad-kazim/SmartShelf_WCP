@@ -1,4 +1,4 @@
-import { CITY_OPTIONS_BY_COUNTRY, DEFAULT_FONT_SETTINGS, DEFAULT_GATEWAY_CONFIG } from './constants';
+import { DEFAULT_FONT_SETTINGS, DEFAULT_GATEWAY_CONFIG } from './constants';
 import type {
   Device,
   DeviceFontSettings,
@@ -89,5 +89,3 @@ export const createEditStoreFormData = (): EditStoreFormData => ({
   ownerName: '',
   ownerSurname: '',
 });
-
-export const getCityOptions = (country: string): string[] => CITY_OPTIONS_BY_COUNTRY[country] ?? [];

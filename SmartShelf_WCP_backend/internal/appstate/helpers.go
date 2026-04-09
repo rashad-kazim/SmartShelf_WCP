@@ -16,15 +16,47 @@ func ErrNotFound() error {
 	return errNotFound
 }
 
+const (
+	ReportIndexOpening = "opening"
+	ReportIndexMiddle  = "middle"
+	ReportIndexClosing = "closing"
+)
+
 func deriveReportIndex(timestamp time.Time) string {
 	hour := timestamp.UTC().Hour()
 	switch {
 	case hour >= 16:
-		return "Closing Logs"
+		return ReportIndexClosing
 	case hour >= 12:
-		return "Middle Logs"
+		return ReportIndexMiddle
 	default:
-		return "Opening Logs"
+		return ReportIndexOpening
+	}
+}
+
+func normalizeReportIndex(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case ReportIndexOpening, "opening logs":
+		return ReportIndexOpening
+	case ReportIndexMiddle, "middle logs":
+		return ReportIndexMiddle
+	case ReportIndexClosing, "closing logs":
+		return ReportIndexClosing
+	default:
+		return ""
+	}
+}
+
+func reportIndexVariants(value string) []string {
+	switch normalizeReportIndex(value) {
+	case ReportIndexOpening:
+		return []string{ReportIndexOpening, "Opening Logs"}
+	case ReportIndexMiddle:
+		return []string{ReportIndexMiddle, "Middle Logs"}
+	case ReportIndexClosing:
+		return []string{ReportIndexClosing, "Closing Logs"}
+	default:
+		return nil
 	}
 }
 

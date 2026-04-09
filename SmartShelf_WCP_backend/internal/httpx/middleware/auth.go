@@ -48,6 +48,12 @@ func AuthMiddleware(state *appstate.State) gin.HandlerFunc {
 			return
 		}
 		if token == "" {
+			cookieValue, err := c.Cookie("wcp_access_token")
+			if err == nil {
+				token = strings.TrimSpace(cookieValue)
+			}
+		}
+		if token == "" {
 			response.Failure(c, http.StatusUnauthorized, "missing_authorization", "Authorization header is required.")
 			c.Abort()
 			return

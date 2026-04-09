@@ -5,10 +5,29 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
+import type { CountryOption } from '@/api/contracts';
 import { translateCity, translateCountry, translateWorkplace } from '@/i18n/ui';
 
-const EmployeeFilter = ({ filters, setFilters, availableCities, availableSupermarkets, countries, handleResetFilters, isRefreshing = false }) => {
-    const { t } = useTranslation();
+const EmployeeFilter = ({ filters, setFilters, availableCities, availableSupermarkets, countries, handleResetFilters, isRefreshing = false }: {
+    filters: { country: string; city: string; supermarket: string };
+    setFilters: React.Dispatch<React.SetStateAction<{ country: string; city: string; supermarket: string }>>;
+    availableCities: string[];
+    availableSupermarkets: string[];
+    countries: CountryOption[];
+    handleResetFilters: () => void;
+    isRefreshing?: boolean;
+}) => {
+    const { t, i18n } = useTranslation();
+    const currentLanguage = (i18n.resolvedLanguage ?? 'en').toLowerCase();
+    const sortedCountries = [...countries].sort((left, right) =>
+        translateCountry(t, left.name, currentLanguage).localeCompare(translateCountry(t, right.name, currentLanguage), currentLanguage),
+    );
+    const sortedCities = [...availableCities].sort((left, right) =>
+        translateCity(t, left).localeCompare(translateCity(t, right), currentLanguage),
+    );
+    const sortedSupermarkets = [...availableSupermarkets].sort((left, right) =>
+        translateWorkplace(t, left).localeCompare(translateWorkplace(t, right), currentLanguage),
+    );
 
     const showSupermarketFilter = availableSupermarkets && availableSupermarkets.length > 0;
 
@@ -31,8 +50,8 @@ const EmployeeFilter = ({ filters, setFilters, availableCities, availableSuperma
                     className="bg-background"
                 >
                     <option value="all">{t('all_countries', 'All Countries')}</option>
-                    {countries.map((country) => (
-                        <option key={country} value={country}>{translateCountry(t, country)}</option>
+                    {sortedCountries.map((country) => (
+                        <option key={country.code || country.name} value={country.name}>{translateCountry(t, country.name, currentLanguage)}</option>
                     ))}
                 </Select>
             </div>
@@ -44,7 +63,7 @@ const EmployeeFilter = ({ filters, setFilters, availableCities, availableSuperma
                     className="bg-background"
                 >
                     <option value="all">{t('all_cities', 'All Cities')}</option>
-                    {availableCities.map((city) => (
+                    {sortedCities.map((city) => (
                         <option key={city} value={city}>{translateCity(t, city)}</option>
                     ))}
                 </Select>
@@ -58,7 +77,7 @@ const EmployeeFilter = ({ filters, setFilters, availableCities, availableSuperma
                         className="bg-background"
                     >
                         <option value="all">{t('all_supermarkets', 'All Supermarkets')}</option>
-                        {availableSupermarkets.map((supermarket) => (
+                        {sortedSupermarkets.map((supermarket) => (
                             <option key={supermarket} value={supermarket}>{translateWorkplace(t, supermarket)}</option>
                         ))}
                     </Select>
@@ -68,8 +87,7 @@ const EmployeeFilter = ({ filters, setFilters, availableCities, availableSuperma
                 <Button 
                     onClick={handleResetFilters} 
                     variant="secondary"
-                    size="sm"
-                    className="w-full"
+                    className="h-12 w-full"
                 >
                     {t('reset', 'Reset')}
                 </Button>
